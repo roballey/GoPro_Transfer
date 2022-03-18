@@ -1,13 +1,17 @@
 #! /bin/python3
 # FIXME: Replace subprocess execution with direct python calls
 import sys
+import os
 import subprocess
 import re
 from goprocam import GoProCamera, constants
 
+# Currently hard coded for my Max
 gopro_wifi="RobsMax360"
 gopro_bt="DF:3D:67:5C:26:b8"
+local_dir="Timelapse_Max"
 
+# Save SSID for currently connected WiFi
 results=subprocess.run(["iwgetid","-r"], capture_output=True, text=True)
 ssid=results.stdout.rstrip("\n")
 
@@ -36,6 +40,11 @@ except:
 
 else:
     print("Connected to GoPro")
+
+    if not os.path.exists(local_dir):
+        os.makedirs(local_dir)
+    os.chdir(local_dir)
+
     medialist = gpCam.listMedia(format=True, media_array=True)
 
     for media in medialist:

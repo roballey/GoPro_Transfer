@@ -1,14 +1,17 @@
 #! /bin/python3
 import sys
+import os
 import subprocess
 import re
 import json
 from goprocam import GoProCamera, constants
 
-# Currently hard coded for Hero 5
+# Currently hard coded for my Hero 5
 gopro_wifi="GP54508924"
 gopro_bt="D8:59:3A:63:0A:8F"
+local_dir="Timelapse_GP5"
 
+# Save SSID for currently connected WiFi
 results=subprocess.run(["iwgetid","-r"], capture_output=True, text=True)
 ssid=results.stdout.rstrip("\n")
 
@@ -38,6 +41,10 @@ except:
 else:
     print("Connected to GoPro")
 
+    if not os.path.exists(local_dir):
+        os.makedirs(local_dir)
+    os.chdir(local_dir)
+
     # TODO: Check this works for all sequences, accross directories etc.
     media = json.loads(gpCam.listMedia())
     for directory in media["media"]:
@@ -55,6 +62,7 @@ else:
             else:
                 print(f"Ignoring non timelapse file {mediaFile['n']}")
 
+    # TODO: Check all downloads and deletes have completed before powering off
     print("Turning off GoPro...")
     gpCam.power_off()
 
