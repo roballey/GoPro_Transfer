@@ -4,6 +4,7 @@ import sys
 import os
 import subprocess
 import re
+import json
 from goprocam import GoProCamera, constants
 
 # Currently hard coded for my Max
@@ -45,18 +46,25 @@ else:
         os.makedirs(local_dir)
     os.chdir(local_dir)
 
-    medialist = gpCam.listMedia(format=True, media_array=True)
-
-    for media in medialist:
-        # TODO: Find a better way of detecting time lapse photos than this regexp, can we use media[2] or [3]?
-        match = re.match("GS[A-Z][A-Z]", media[1])
-        if match:
-            # TODO: download to a specified directory
-            gpCam.downloadMultiShot(f"{media[0]}/{media[1]}")
+    media = json.loads(gpCam.listMedia())
+    for directory in media["media"]:
+        dirname  = directory["d"]
+        for mediaFile in directory["fs"]:
+            filename = mediaFile["n"];
+            if 'b' in mediaFile:
+                base=filename[:4]
+                start=int(mediaFile["b"])
+                end=int(mediaFile["l"])
+                for i in range(start,end+1):
+                    print(f"Download then delete {dirname}/{base}{i:04d}.JPG")
+                    gpCam.downloadMedia(dirname,f"{base}{i:04d}.JPG")
+                    gpCam.deleteFile(dirname, f"{base}{i:04d}.JPG")
+            else:
+                print(f"Ignoring non timelapse file {mediaFile['n']}")
 
     print("Turning off GoPro...")
     gpCam.power_off()
 
 # FIXME: Why does reconnecting to UnifiAP throw an error but others work ok?
 print(f"Re-connecting to previous WiFi network '{ssid}'...")
-subprocess.run(["nmcli","c","up", "id", ssid])
+subprocess.run(["nmcli","c","up", "id", "Auto UnifiAP5"])
