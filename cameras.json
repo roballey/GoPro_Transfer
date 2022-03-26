@@ -1,0 +1,14 @@
+{
+	"cameras": [
+		{
+			"camera": "Max",
+			"bt": "DF:3D:67:5C:26:b8",
+			"wifi": "RobsMax360"
+		},
+		{
+			"camera": "Hero5",
+			"bt": "D8:59:3A:63:0A:8F",
+			"wifi": "GP54508924"
+		}
+	]
+}
