@@ -8,6 +8,7 @@ from goprocam import GoProCamera, constants
 from exif import Image
 from geopy.geocoders import Nominatim
 import time
+from datetime import datetime
 
 import exif_latlon
 
@@ -63,9 +64,12 @@ except:
 else:
 
     # Place all images beneath a camera specific directory
-    if not os.path.exists(camera):
-        os.makedirs(camera)
-    os.chdir(camera)
+    now = datetime.now().strftime("%Y-%m-%d") 
+    cameraDir=f"{now}_{camera}"
+    if not os.path.exists(cameraDir):
+        os.makedirs(cameraDir)
+    os.chdir(cameraDir)
+    print(f"Images will be downloaded to {cameraDir}")
 
     media = json.loads(gpCam.listMedia())
     for directory in media["media"]:
