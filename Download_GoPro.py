@@ -112,18 +112,25 @@ subprocess.run(["nmcli","c","up", "id", "Auto UnifiAP5"])
 geolocator = Nominatim(user_agent="GoPro_Transfer")
 
 for dirName, fileName in sequences:
-    print(f"Moving {dirName}/{fileName}...")
-    lat,lon = exif_latlon.get_lat_lon(f"{dirName}/{fileName}")
+    fullName=os.path.join(dirName,fileName)
+    print(f"Moving {fullName}...")
+    lat,lon = exif_latlon.get_lat_lon(fullName)
     if lat is None:
         print("No lat/lon, not moving")
     else:
         location = geolocator.reverse((lat, lon))
 
         locName=""
-        if 'suburb' in location.raw['address']:
-            locName=location.raw['address']['suburb']
-        elif 'hamlet' in location.raw['address']:
+        if 'hamlet' in location.raw['address']:
             locName=location.raw['address']['hamlet']
+        elif 'suburb' in location.raw['address']:
+            locName=location.raw['address']['suburb']
+        elif 'town' in location.raw['address']:
+            locName=location.raw['address']['town']
+        elif 'city' in location.raw['address']:
+            locName=location.raw['address']['city']
+        else:
+            print(f"{fullName} No location from - {location.raw}")
 
         locName=locName.replace(" ","_")
         print(locName)
