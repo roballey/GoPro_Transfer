@@ -98,7 +98,16 @@ else:
                     gpCam.deleteFile(dirname, image)
                 os.chdir("..")
             else:
-                print(f"Ignoring non timelapse file {mediaFile['n']}")
+                # Place non-timelapse files in their own directory
+                dirName=f"NonTimeLapse_{camera}"
+                if not os.path.exists(dirName):
+                    os.makedirs(dirName)
+                os.chdir(dirName)
+                image=mediaFile['n']
+                #print(f"Download then delete {dirname}/{filename}")
+                gpCam.downloadMedia(dirname,filename)
+                gpCam.deleteFile(dirname, filename)
+                os.chdir("..")
 
     print("Turning off GoPro...")
     gpCam.power_off()
