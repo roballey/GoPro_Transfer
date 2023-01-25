@@ -89,11 +89,12 @@ else:
 
                 start=int(mediaFile["b"])
                 end=int(mediaFile["l"])
+                print(f"---Download sequence of {end-start} images")
                 for i in range(start,end+1):
                     image=f"{base}{i:04d}.JPG"
-                    #print(f"Download then delete {dirname}/{image}")
                     if i==start:
                         sequences.append((dirName, image))
+                    print(f"   ---Download image {i-start}/{end-start} ",end=" ")
                     gpCam.downloadMedia(dirname,image)
                     gpCam.deleteFile(dirname, image)
                 os.chdir("..")
@@ -104,7 +105,7 @@ else:
                     os.makedirs(dirName)
                 os.chdir(dirName)
                 image=mediaFile['n']
-                #print(f"Download then delete {dirname}/{filename}")
+                print(f"---Download non-timelapse image ",end=" ")
                 gpCam.downloadMedia(dirname,filename)
                 gpCam.deleteFile(dirname, filename)
                 os.chdir("..")
