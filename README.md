@@ -7,11 +7,12 @@ After transfering (moving) all images switches back to the original WiFi network
 
 ## Limitations
 - Tested with Hero 5 Black and Max 360, may or may not work with other models
+- Fails with Hero 5 Black containing ~10000 time lapse photos
 
 ## Notes
 Was not working using higher level `goprocam` library functions to download sequences, hence the hand rolled nature of the download.
 
-Camera must have been previously paied to the PC via Bluetooth.
+Camera must have been previously paired to the PC via Bluetooth.
 PC must have been previously connected to the GoPro's WiFi network and the password saved.
 
 ## Dependencies
