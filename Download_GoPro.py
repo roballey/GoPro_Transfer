@@ -1,5 +1,6 @@
 #! /bin/python3
 # FIXME: Replace subprocess execution with direct python calls
+# FIXME: Does not work with GoPro MAX and 5Ghz WiFi band
 import sys
 import os
 import subprocess
