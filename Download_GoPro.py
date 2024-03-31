@@ -1,6 +1,9 @@
 #! /bin/python3
 # FIXME: Replace subprocess execution with direct python calls
 # FIXME: Does not work with GoPro MAX and 5Ghz WiFi band
+# Upgraded GoProCam to 4.2.0, can now connect WiFi on Hero 10
+# Had to go connections->connect device->the remote on Hero 10 every time for BT connection to work but no lo0nger seems required
+# Was getting errors doing listMedia on Hero 10 but now working 
 import sys
 import os
 import subprocess
@@ -63,16 +66,19 @@ except:
     print(f"Unable to connect to GoPro: {sys.exc_info()[0]}");
 
 else:
+    # Report camera overview
+    gpCam.overview()
 
-    # Place all images beneath a camera specific directory
+    # Place all files beneath a camera specific directory
     now = datetime.now().strftime("%Y-%m-%d") 
     cameraDir=f"{now}_{camera}"
     if not os.path.exists(cameraDir):
         os.makedirs(cameraDir)
     os.chdir(cameraDir)
-    print(f"Images will be downloaded to {cameraDir}")
+    print(f"GoPro files will be downloaded to {cameraDir}")
 
     media = json.loads(gpCam.listMedia())
+
     for directory in media["media"]:
         dirname  = directory["d"]
         for mediaFile in directory["fs"]:
@@ -99,6 +105,7 @@ else:
                     gpCam.downloadMedia(dirname,image)
                     gpCam.deleteFile(dirname, image)
                 os.chdir("..")
+                # TODO: Rename directory here 1 at a time instead of all at once at end
             else:
                 # Place non-timelapse files in their own directory
                 dirName=f"NonTimeLapse_{camera}"
@@ -106,7 +113,7 @@ else:
                     os.makedirs(dirName)
                 os.chdir(dirName)
                 image=mediaFile['n']
-                print(f"---Download non-timelapse image ",end=" ")
+                print(f"---Download non-timelapse file ",end=" ")
                 gpCam.downloadMedia(dirname,filename)
                 gpCam.deleteFile(dirname, filename)
                 os.chdir("..")

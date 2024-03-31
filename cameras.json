@@ -1,19 +1,19 @@
 {
 	"cameras": [
 		{
-			"camera": "Max",
-			"bt": "DF:3D:67:5C:26:b8",
-			"wifi": "RobsMax360"
-		},
-		{
 			"camera": "Hero5",
 			"bt": "D8:59:3A:63:0A:8F",
 			"wifi": "GP54508924"
 		},
 		{
-			"camera": "Max2",
-			"bt": "F7:53:84:89:3F:82",
-			"wifi": "GP24904193"
+			"camera": "Hero10",
+			"bt": "D5:82:61:7B:64:03",
+			"wifi": "HERO10 Black"
+		},
+		{
+			"camera": "Max4",
+			"bt": "CD:68:8E:1A:7F:9B",
+			"wifi": "GoPro MAX4"
 		}
 	]
 }

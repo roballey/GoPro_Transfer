@@ -12,7 +12,7 @@ After transfering (moving) all images switches back to the original WiFi network
 ## Notes
 Was not working using higher level `goprocam` library functions to download sequences, hence the hand rolled nature of the download.
 
-Camera must have been previously paired to the PC via Bluetooth.
+Camera must have been previously paired to the PC via Bluetooth.  (On GOPro Max select Preferences->Connections->Connect Device->GoPro App then open Blutooth settings in Linux Mint and check for new GoPro device and setup. Then copy BT mac address from device info into cameras.json file)
 PC must have been previously connected to the GoPro's WiFi network and the password saved.
 
 ## Dependencies
