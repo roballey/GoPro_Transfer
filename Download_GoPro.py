@@ -1,9 +1,10 @@
 #! /bin/python3
-# FIXME: Replace subprocess execution with direct python calls
 # FIXME: Does not work with GoPro MAX and 5Ghz WiFi band
 # Upgraded GoProCam to 4.2.0, can now connect WiFi on Hero 10
-# Had to go connections->connect device->the remote on Hero 10 every time for BT connection to work but no longer seems required
-# Was getting errors doing listMedia on Hero 10 but now working 
+#
+# Changes:
+#  - Replaced ble subprocess execution with direct python calls
+
 import sys
 import os
 import subprocess
@@ -13,8 +14,12 @@ from exif import Image
 from geopy.geocoders import Nominatim
 import time
 from datetime import datetime
-
 import exif_latlon
+import asyncio
+
+# Search for import modules in gopro-ble-py directory alongside current dir
+sys.path.insert(0, '../gopro-ble-py')
+import main as ble
 
 configFile = "cameras.json"
 sequences=[]
@@ -24,8 +29,8 @@ if len(sys.argv) != 2:
     print("Must specify camera to use")
     sys.exit(1)
 
-print(f"Transferring files from GoPro {sys.argv[1]}")
-print("============\n\n\n")
+print(f"\n\nTransferring files from GoPro '{sys.argv[1]}'")
+print("=======================================================\n")
 
 # Get camera BlueTooth MAC address and Wifi SSID from config file
 camera = None
@@ -47,18 +52,32 @@ ssid=results.stdout.rstrip("\n")
 
 # Try connecting to GoPro via Bluetooth and turning on Wifi,
 print(f"Establishing BlueTooth connection to GoPro '{camera}'...")
-results=subprocess.run(["python3","../gopro-ble-py/main.py","--address", gopro_bt, "--command", "wifi on"])
+print("-------------------------------------------------------\n")
+bt_connected=False
+bt_tried=0
 
-# If BT connection fails, prompt user to turn GoPro on and try again...
-if results.returncode == 1:
-    input(f"Power on GoPro '{camera}' and press <ENTER>: ")
-    results=subprocess.run(["python3","../gopro-ble-py/main.py","--address", gopro_bt, "--command", "wifi on"])
-    if results.returncode == 1:
-        print(f"Unable to connect to camera '{camera}' via BlueTooth and turn on WiFi, aborting")
-        sys.exit(1)
+while ( (not bt_connected) and (bt_tried < 2)):
+    try:
+      bt_tried = bt_tried+1
+      print(f"  Connection attempt {bt_tried}")
+      asyncio.run(ble.run(gopro_bt, "wifi on"))
+
+    # If BT connection fails, prompt user to turn GoPro on and try again...
+    except:
+        if (bt_tried < 2):
+          print(f"  Unable to connect via Bluetooth")
+          input(f"    Ensure remote is not connected.\n    Power on GoPro '{camera}' and press <ENTER>: ")
+
+    else:
+        bt_connected=True
+
+if (not bt_connected):
+  print(f"Unable to connect to '{camera}' via Bluetooth")
+  sys.exit(1)
 
 # Connect computer to GoPro WiFi
 print(f"Connecting to GoPro '{camera}' Wifi network '{gopro_wifi}'...")
+print("-------------------------------------------------------\n")
 results=subprocess.run(["nmcli","c","up", "id", gopro_wifi])
 print(f"Status = {results.returncode}")
 
@@ -79,6 +98,7 @@ else:
         os.makedirs(cameraDir)
     os.chdir(cameraDir)
     print(f"GoPro files will be downloaded to {cameraDir}")
+    print("-------------------------------------------------------\n")
 
     media = json.loads(gpCam.listMedia())
 
@@ -122,15 +142,17 @@ else:
                 os.chdir("..")
 
     print("Turning off GoPro...")
+    print("-------------------------------------------------------\n")
     gpCam.power_off()
 
-# FIXME: ssid as reported by iwgetid is not always the same as name/id used by nmcli
+# FIXME: ssid as reported by iwgetid is not always the same as name/id used by nmcli, prepending "Auto "
 print(f"Re-connecting to previous WiFi network '{ssid}'...")
-# DNF Using hardcoded name iso ssid here to get around the above FIXME
-subprocess.run(["nmcli","c","up", "id", "Auto UnifiAP5"])
+print("-------------------------------------------------------\n")
+subprocess.run(["nmcli","c","up", "id", "Auto "+ssid])
 
 # Rename directories based on location reverse geocoded from exif lat, long of first image in each sequence
 print("Renaming directories")
+print("-------------------------------------------------------\n")
 geolocator = Nominatim(user_agent="GoPro_Transfer")
 
 for dirName, fileName in sequences:
