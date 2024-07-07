@@ -2,7 +2,7 @@
 # FIXME: Replace subprocess execution with direct python calls
 # FIXME: Does not work with GoPro MAX and 5Ghz WiFi band
 # Upgraded GoProCam to 4.2.0, can now connect WiFi on Hero 10
-# Had to go connections->connect device->the remote on Hero 10 every time for BT connection to work but no lo0nger seems required
+# Had to go connections->connect device->the remote on Hero 10 every time for BT connection to work but no longer seems required
 # Was getting errors doing listMedia on Hero 10 but now working 
 import sys
 import os
@@ -23,6 +23,9 @@ sequences=[]
 if len(sys.argv) != 2:
     print("Must specify camera to use")
     sys.exit(1)
+
+print(f"Transferring files from GoPro {sys.argv[1]}")
+print("============\n\n\n")
 
 # Get camera BlueTooth MAC address and Wifi SSID from config file
 camera = None
@@ -127,31 +130,36 @@ print(f"Re-connecting to previous WiFi network '{ssid}'...")
 subprocess.run(["nmcli","c","up", "id", "Auto UnifiAP5"])
 
 # Rename directories based on location reverse geocoded from exif lat, long of first image in each sequence
+print("Renaming directories")
 geolocator = Nominatim(user_agent="GoPro_Transfer")
 
 for dirName, fileName in sequences:
     fullName=os.path.join(dirName,fileName)
-    print(f"Moving {fullName}...")
-    lat,lon = exif_latlon.get_lat_lon(fullName)
-    if lat is None:
-        print("No lat/lon, not moving")
-    else:
-        location = geolocator.reverse((lat, lon))
-
-        locName=""
-        if 'hamlet' in location.raw['address']:
-            locName=location.raw['address']['hamlet']
-        elif 'suburb' in location.raw['address']:
-            locName=location.raw['address']['suburb']
-        elif 'town' in location.raw['address']:
-            locName=location.raw['address']['town']
-        elif 'city' in location.raw['address']:
-            locName=location.raw['address']['city']
+    print(f"Renaming {dirName}...")
+    try:
+        # FIXME: Getting lat long now throws exception
+        lat,lon = exif_latlon.get_lat_lon(fullName)
+        if lat is None:
+            print("No lat/lon, not moving")
         else:
-            print(f"{fullName} No location from - {location.raw}")
+            location = geolocator.reverse((lat, lon))
 
-        locName=locName.replace(" ","_")
-        print(locName)
-        os.rename(dirName, f"{dirName}_{locName}")
-        time.sleep(2)  # Delay so as to be a good citizen and not abuse nominatim
-    print()
+            locName=""
+            if 'hamlet' in location.raw['address']:
+                locName=location.raw['address']['hamlet']
+            elif 'suburb' in location.raw['address']:
+                locName=location.raw['address']['suburb']
+            elif 'town' in location.raw['address']:
+                locName=location.raw['address']['town']
+            elif 'city' in location.raw['address']:
+                locName=location.raw['address']['city']
+            else:
+                print(f"{fullName} No location from - {location.raw}")
+
+            locName=locName.replace(" ","_")
+            print(locName)
+            os.rename(dirName, f"{dirName}_{locName}")
+            time.sleep(2)  # Delay so as to be a good citizen and not abuse nominatim
+        print()
+    except:
+        print(f"Unable to rename {dirName}")
