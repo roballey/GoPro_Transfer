@@ -4,6 +4,8 @@
 #
 # Changes:
 #  - Replaced ble subprocess execution with direct python calls
+#  - Updated exif_latlon.py
+#  - WIP: improve modularisation
 
 import sys
 import os
@@ -23,6 +25,42 @@ import main as ble
 
 configFile = "cameras.json"
 sequences=[]
+
+def rename_directories(sequences):
+    # Rename directories based on location reverse geocoded from exif lat, long of first image in each sequence
+    print("Renaming directories")
+    print("-------------------------------------------------------\n")
+    geolocator = Nominatim(user_agent="GoPro_Transfer")
+
+    for dirName, fileName in sequences:
+        fullName=os.path.join(dirName,fileName)
+        print(f"Renaming {dirName}...")
+        try:
+            lat,lon = exif_latlon.get_lat_lon(fullName)
+            if lat is None:
+                print("No lat/lon, not moving")
+            else:
+                location = geolocator.reverse((lat, lon))
+
+                locName=""
+                if 'hamlet' in location.raw['address']:
+                    locName=location.raw['address']['hamlet']
+                elif 'suburb' in location.raw['address']:
+                    locName=location.raw['address']['suburb']
+                elif 'town' in location.raw['address']:
+                    locName=location.raw['address']['town']
+                elif 'city' in location.raw['address']:
+                    locName=location.raw['address']['city']
+                else:
+                    print(f"{fullName} No location from - {location.raw}")
+
+                locName=locName.replace(" ","_")
+                print(locName)
+                os.rename(dirName, f"{dirName}_{locName}")
+                time.sleep(2)  # Delay so as to be a good citizen and not abuse nominatim
+            print()
+        except:
+            print(f"Unable to rename {dirName}")
 
 # Check for correct usage: Download_GoPro.py <Camera>
 if len(sys.argv) != 2:
@@ -150,38 +188,4 @@ print(f"Re-connecting to previous WiFi network '{ssid}'...")
 print("-------------------------------------------------------\n")
 subprocess.run(["nmcli","c","up", "id", "Auto "+ssid])
 
-# Rename directories based on location reverse geocoded from exif lat, long of first image in each sequence
-print("Renaming directories")
-print("-------------------------------------------------------\n")
-geolocator = Nominatim(user_agent="GoPro_Transfer")
-
-for dirName, fileName in sequences:
-    fullName=os.path.join(dirName,fileName)
-    print(f"Renaming {dirName}...")
-    try:
-        # FIXME: Getting lat long now throws exception
-        lat,lon = exif_latlon.get_lat_lon(fullName)
-        if lat is None:
-            print("No lat/lon, not moving")
-        else:
-            location = geolocator.reverse((lat, lon))
-
-            locName=""
-            if 'hamlet' in location.raw['address']:
-                locName=location.raw['address']['hamlet']
-            elif 'suburb' in location.raw['address']:
-                locName=location.raw['address']['suburb']
-            elif 'town' in location.raw['address']:
-                locName=location.raw['address']['town']
-            elif 'city' in location.raw['address']:
-                locName=location.raw['address']['city']
-            else:
-                print(f"{fullName} No location from - {location.raw}")
-
-            locName=locName.replace(" ","_")
-            print(locName)
-            os.rename(dirName, f"{dirName}_{locName}")
-            time.sleep(2)  # Delay so as to be a good citizen and not abuse nominatim
-        print()
-    except:
-        print(f"Unable to rename {dirName}")
+rename_directories(sequences)

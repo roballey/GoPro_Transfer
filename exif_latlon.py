@@ -1,45 +1,49 @@
 #! /bin/python3
-from PIL import Image, ExifTags
+from PIL import Image
+from PIL.ExifTags import TAGS, GPSTAGS
 
-sequences = [("Test_Images","Max_GPS.JPG"), ("Test_Images","Max_NoGPS.JPG")]
-
-# Get a float from numerator and denominator pair
-get_float = lambda x: float(x[0]) / float(x[1])
-
-# Convert exif degree, minute, seconds as num/denom to decimal degrees
-def convert_to_degrees(value):
-    deg = get_float(value[0])
-    minutes = get_float(value[1])
-    seconds = get_float(value[2])
-    return deg + (minutes / 60.0) + (seconds / 3600.0)
-
-# Extract decimal latitude and longitude from exif dictionary
-def extract_lat_lon(exif):
+def get_exif(filename):
+    """Returns a dictionary of EXIF data from a file"""
+    exif_data = {}
+    image = Image.open(filename)
     try:
-        gps_latitude = exif[34853][2]
-        gps_latitude_ref = exif[34853][1]
-        gps_longitude = exif[34853][4]
-        gps_longitude_ref = exif[34853][3]
-        lat = convert_to_degrees(gps_latitude)
-        if gps_latitude_ref != "N":
-            lat = -lat
+        info = image._getexif()
+        if info:
+            for tag, value in info.items():
+                decoded = TAGS.get(tag, tag)
+                if decoded == "GPSInfo":
+                    gps_data = {}
+                    for sub_tag in value:
+                        sub_decoded = GPSTAGS.get(sub_tag, sub_tag)
+                        gps_data[sub_decoded] = value[sub_tag]
 
-        lon = convert_to_degrees(gps_longitude)
-        if gps_longitude_ref != "E":
-            lon = -lon
-        return lat, lon
-    except KeyError:
-        return None, None
+                    exif_data[decoded] = gps_data
+                else:
+                    exif_data[decoded] = value
+        else:
+             print("No EXIF data found")
+             quit()
+
+        return exif_data
+    except:
+        print("Exception getting exif dictionary")
+        return None
+
+def dms_to_decimal_degrees(ref, dms):
+    """Return an EXIF latitude or longitude in deciemal degrees"""
+    decimal = dms[0] + (dms[1]/60.0) + (dms[2]/3600.0)
+    if (ref == "S") or (ref == "W"):
+        decimal = 0 - decimal
+    return decimal
 
 def get_lat_lon(imageFile):
     try:
-        image = Image.open(imageFile)
+        exif=get_exif(imageFile)
     except:
-        print(f"Could not open {imageFile}")
+        print(f"Could not get EXIF info from {imageFile}")
         return None, None
 
-    exif = image.getexif()
-    if exif is None:
-        print('No exif data')
-        return None, None
-    return extract_lat_lon(exif)
+    return dms_to_decimal_degrees(exif['GPSInfo']['GPSLatitudeRef'], exif['GPSInfo']['GPSLatitude']), dms_to_decimal_degrees(exif['GPSInfo']['GPSLongitudeRef'], exif['GPSInfo']['GPSLongitude'])
+
+
+#print(f"Lat,lon: {get_lat_lon('2024-08-25_Max4/GSAA_Max4/GSAA7867.JPG')}")
