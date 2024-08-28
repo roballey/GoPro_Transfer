@@ -43,7 +43,10 @@ def get_lat_lon(imageFile):
         print(f"Could not get EXIF info from {imageFile}")
         return None, None
 
-    return dms_to_decimal_degrees(exif['GPSInfo']['GPSLatitudeRef'], exif['GPSInfo']['GPSLatitude']), dms_to_decimal_degrees(exif['GPSInfo']['GPSLongitudeRef'], exif['GPSInfo']['GPSLongitude'])
+    try:
+        return dms_to_decimal_degrees(exif['GPSInfo']['GPSLatitudeRef'], exif['GPSInfo']['GPSLatitude']), dms_to_decimal_degrees(exif['GPSInfo']['GPSLongitudeRef'], exif['GPSInfo']['GPSLongitude'])
+    except KeyError:
+        return None,None
 
 
 #print(f"Lat,lon: {get_lat_lon('2024-08-25_Max4/GSAA_Max4/GSAA7867.JPG')}")
