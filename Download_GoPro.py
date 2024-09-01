@@ -1,8 +1,8 @@
 #! /bin/python3
 # FIXME: Does not work with GoPro MAX and 5Ghz WiFi band
-# Upgraded GoProCam to 4.2.0, can now connect WiFi on Hero 10
 #
 # Changes:
+#  - Upgraded GoProCam to 4.2.0, can now connect WiFi on Hero 10
 #  - Replaced ble subprocess execution with direct python calls
 #  - Updated exif_latlon.py
 #  - WIP: improve modularisation
@@ -34,7 +34,7 @@ def rename_directories(sequences):
 
     for dirName, fileName in sequences:
         fullName=os.path.join(dirName,fileName)
-        print(f"Renaming {dirName}...")
+        print(f"Renaming {dirName} based on {fileName} ...")
         try:
             lat,lon = exif_latlon.get_lat_lon(fullName)
             if lat is None:
@@ -45,6 +45,8 @@ def rename_directories(sequences):
                 locName=""
                 if 'hamlet' in location.raw['address']:
                     locName=location.raw['address']['hamlet']
+                elif 'village' in location.raw['address']:
+                    locName=location.raw['address']['village']
                 elif 'suburb' in location.raw['address']:
                     locName=location.raw['address']['suburb']
                 elif 'town' in location.raw['address']:
@@ -59,8 +61,8 @@ def rename_directories(sequences):
                 os.rename(dirName, f"{dirName}_{locName}")
                 time.sleep(2)  # Delay so as to be a good citizen and not abuse nominatim
             print()
-        except:
-            print(f"Unable to rename {dirName}")
+        except Exception as inst:
+            print(f"Unable to rename {dirName}, exception {type(inst)}")
 
 # Check for correct usage: Download_GoPro.py <Camera>
 if len(sys.argv) != 2:
@@ -166,7 +168,6 @@ else:
                     gpCam.downloadMedia(dirname,image)
                     gpCam.deleteFile(dirname, image)
                 os.chdir("..")
-                # TODO: Rename directory here 1 at a time instead of all at once at end
             else:
                 # Place non-timelapse files in their own directory
                 dirName=f"NonTimeLapse_{camera}"
@@ -183,9 +184,11 @@ else:
     print("-------------------------------------------------------\n")
     gpCam.power_off()
 
-# FIXME: ssid as reported by iwgetid is not always the same as name/id used by nmcli, prepending "Auto "
+# FIXME: ssid as reported by iwgetid is not always the same as name/id used by nmcli (sometimes it has "Auto" pre-pended)
 print(f"Re-connecting to previous WiFi network '{ssid}'...")
 print("-------------------------------------------------------\n")
-subprocess.run(["nmcli","c","up", "id", "Auto "+ssid])
+subprocess.run(["nmcli","c","up", "id", ssid])
+
+time.sleep(2)  # Delay to ensure network reconnection is complete
 
 rename_directories(sequences)
