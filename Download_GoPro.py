@@ -6,9 +6,12 @@
 #  - Replaced ble subprocess execution with direct python calls
 #  - Updated exif_latlon.py
 #  - WIP: improve modularisation
+#  - WIP: Also support direct transfer of MTP mounted GoPro (works except for directory renaming)
 
 import sys
 import os
+from pathlib import Path
+import shutil
 import subprocess
 import json
 from goprocam import GoProCamera, constants
@@ -20,10 +23,11 @@ import exif_latlon
 import asyncio
 
 # Search for import modules in gopro-ble-py directory alongside current dir
+# FIXME: Make this work when script is executed from anywhere
 sys.path.insert(0, '../gopro-ble-py')
 import main as ble
 
-configFile = "cameras.json"
+configFile = Path.home() / ".config" / "goprotransfer.json"
 sequences=[]
 
 def rename_directories(sequences):
@@ -64,6 +68,19 @@ def rename_directories(sequences):
         except Exception as inst:
             print(f"Unable to rename {dirName}, exception {type(inst)}")
 
+def Create_Dir(camera):
+    # Place all files beneath a camera specific directory
+    now = datetime.now().strftime("%Y-%m-%d") 
+    cameraDir=f"{now}_{camera}"
+    if not os.path.exists(cameraDir):
+        print(f"Creating directory '{cameraDir}'")
+        os.makedirs(cameraDir)
+    else:
+        print(f"Using existing directory '{cameraDir}'")
+    print(f"GoPro files will be transferred to {cameraDir}")
+    print("-------------------------------------------------------\n")
+    os.chdir(cameraDir)
+
 # Check for correct usage: Download_GoPro.py <Camera>
 if len(sys.argv) != 2:
     print("Must specify camera to use")
@@ -75,6 +92,8 @@ print("=======================================================\n")
 # Get camera BlueTooth MAC address and Wifi SSID from config file
 camera = None
 config = json.load(open(configFile, "r"))
+# WIP: put all files relative to workDir (see dirName below)
+workDir = config['work_dir']
 for i in config['cameras']:
     if i['camera'] == sys.argv[1]:
         gopro_bt = i['bt']
@@ -88,13 +107,34 @@ if camera is None:
     sys.exit(1)
 
 if os.path.exists(gopro_mtp):
-    print(f"{camera} connected via USB/MTP...")
+    print(f"{camera} connected via USB/MTP.")
 
-    print("FIXME: Transfer files.")
-    # Can spawn command and use "gio copy <SRC> <DEST>" to copy files from MTP mount
+    src=f"{gopro_mtp}/GoPro MTP Client Disk Volume/DCIM"
+    if os.path.exists(src):
+        now = datetime.now().strftime("%Y-%m-%d") 
+        cameraDir=f"{now}_{camera}"
+
+        print(f"Transfering files from beneath '{src}' to '{cameraDir}'...")
+
+        # FIXME: Show a progress indicator
+
+        shutil.move(f"{src}", cameraDir)
+
+        # FIXME: Build list of directory and filenames in sequences for rename_directories
+
+        print(f"Transfer done.")
+    else:
+        print(f"Could not find '{src}'")
+        quit()
+
+    # FIXME: Move to end of script once below FIXME is fixed
+    subprocess.Popen(["nemo",cameraDir], start_new_session=True)
+
+    # FIXME: Remove quit once sequences is built
     quit()
 
 else:
+    print(f"'{gopro_mtp} does not exist")
     print("Camera not connected via USB/MTP, trying Bluetooth/WiFi")
 
     # Save SSID for currently connected WiFi
@@ -142,19 +182,12 @@ else:
         # Report camera overview
         gpCam.overview()
 
-        # Place all files beneath a camera specific directory
-        now = datetime.now().strftime("%Y-%m-%d") 
-        cameraDir=f"{now}_{camera}"
-        if not os.path.exists(cameraDir):
-            os.makedirs(cameraDir)
-        os.chdir(cameraDir)
-        print(f"GoPro files will be downloaded to {cameraDir}")
-        print("-------------------------------------------------------\n")
+        Create_Dir(camera)
 
         media = json.loads(gpCam.listMedia())
 
         for directory in media["media"]:
-            dirname  = directory["d"]
+            srcdirname  = directory["d"]
             for mediaFile in directory["fs"]:
                 filename = mediaFile["n"];
 
@@ -176,8 +209,8 @@ else:
                         if i==start:
                             sequences.append((dirName, image))
                         print(f"   ---Download image {i-start}/{end-start} ",end=" ")
-                        gpCam.downloadMedia(dirname,image)
-                        gpCam.deleteFile(dirname, image)
+                        gpCam.downloadMedia(srcdirname,image)
+                        gpCam.deleteFile(srcdirname, image)
                     os.chdir("..")
                 else:
                     # Place non-timelapse files in their own directory
@@ -187,8 +220,8 @@ else:
                     os.chdir(dirName)
                     image=mediaFile['n']
                     print(f"---Download non-timelapse file ",end=" ")
-                    gpCam.downloadMedia(dirname,filename)
-                    gpCam.deleteFile(dirname, filename)
+                    gpCam.downloadMedia(srcdirname,filename)
+                    gpCam.deleteFile(srcdirname, filename)
                     os.chdir("..")
 
         print("Turning off GoPro...")
