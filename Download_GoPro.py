@@ -21,11 +21,11 @@ import time
 from datetime import datetime
 import exif_latlon
 import asyncio
+import argparse
+import re
+from tqdm import tqdm
 
-# Search for import modules in gopro-ble-py directory alongside current dir
-# FIXME: Make this work when script is executed from anywhere
-sys.path.insert(0, '../gopro-ble-py')
-import main as ble
+from gopro_ble import main as ble
 
 configFile = Path.home() / ".config" / "goprotransfer.json"
 sequences=[]
@@ -68,34 +68,54 @@ def rename_directories(sequences):
         except Exception as inst:
             print(f"Unable to rename {dirName}, exception {type(inst)}")
 
-def Create_Dir(camera):
-    # Place all files beneath a camera specific directory
+def CreateDir(directory):
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+
+def CreateAndChangeToDestDir(camera):
     now = datetime.now().strftime("%Y-%m-%d") 
-    cameraDir=f"{now}_{camera}"
-    if not os.path.exists(cameraDir):
-        print(f"Creating directory '{cameraDir}'")
-        os.makedirs(cameraDir)
+    directory=f"{now}_{camera}"
+    if not os.path.exists(directory):
+        print(f"Creating directory '{directory}'")
+        os.makedirs(directory)
     else:
-        print(f"Using existing directory '{cameraDir}'")
-    print(f"GoPro files will be transferred to {cameraDir}")
+        print(f"Using existing directory '{directory}'")
+    print(f"GoPro files will be transferred to {directory}")
     print("-------------------------------------------------------\n")
-    os.chdir(cameraDir)
+    os.chdir(directory)
 
-# Check for correct usage: Download_GoPro.py <Camera>
-if len(sys.argv) != 2:
-    print("Must specify camera to use")
-    sys.exit(1)
+#==============================================================================
+parser = argparse.ArgumentParser(
+                    prog='Download_GoPro',
+                    description='Transfer files from GoPro to computer')
+parser.add_argument('-dm', '--dont-move', help="Don't move files from camera (copy instead), for development use",
+                    action='store_true') 
 
-print(f"\n\nTransferring files from GoPro '{sys.argv[1]}'")
+parser.add_argument('Camera', help="Name of camera from which to transfer")
+args = parser.parse_args()
+
+if args.dont_move:
+    print(f"\nCopying instead of moving files\n")
+    mtp_transfer=shutil.copy
+else:
+    mtp_transfer=shutil.move
+
+print(f"\n\nTransferring files from GoPro '{args.Camera}'")
 print("=======================================================\n")
 
-# Get camera BlueTooth MAC address and Wifi SSID from config file
+if not os.path.exists(configFile):
+    print(f"ERROR: Config file '{configFile}' does not exist")
+    quit()
+
+# Get camera details from config file
 camera = None
 config = json.load(open(configFile, "r"))
+
 # WIP: put all files relative to workDir (see dirName below)
 workDir = config['work_dir']
+
 for i in config['cameras']:
-    if i['camera'] == sys.argv[1]:
+    if i['camera'] == args.Camera:
         gopro_bt = i['bt']
         gopro_wifi = i['wifi']
         gopro_mtp = i['mtp']
@@ -103,38 +123,65 @@ for i in config['cameras']:
         #print(f"{camera} {gopro_bt} {gopro_wifi}")
 
 if camera is None:
-    print(f"No entry for camera {sys.argv[1]} in '{configFile}'")
+    print(f"No entry for camera '{args.Camera}' in '{configFile}'")
     sys.exit(1)
 
 if os.path.exists(gopro_mtp):
     print(f"{camera} connected via USB/MTP.")
 
-    src=f"{gopro_mtp}/GoPro MTP Client Disk Volume/DCIM"
-    if os.path.exists(src):
+    src_dir=f"{gopro_mtp}/GoPro MTP Client Disk Volume/DCIM"
+    if os.path.exists(src_dir):
         now = datetime.now().strftime("%Y-%m-%d") 
-        cameraDir=f"{now}_{camera}"
+        dest_dir=os.path.join(workDir,f"{now}_{camera}")
 
-        print(f"Transfering files from beneath '{src}' to '{cameraDir}'...")
+        dest_still_dir=os.path.join(dest_dir,f"Stills")
+        dest_video_dir=os.path.join(dest_dir,f"Video")
 
-        # FIXME: Show a progress indicator
+        print(f"Transfering files from beneath '{src_dir}' to '{dest_dir}'...")
+        for root, dirs, files in os.walk(src_dir, topdown=False):
+            num_files=len(files)
+            with tqdm(total=num_files) as pbar:
+                for file in files:
+                    pbar.update(1)
+                    src_file=os.path.join(root,file)
+                    if re.match("GS__.*\.JPG",file):
+                        CreateDir(dest_still_dir)
+                        #print(f"Still Image {file} -> {dest_still_dir}")
+                        mtp_transfer(f"{src_file}", dest_still_dir)
+                    elif re.match("GS.*\.JPG",file):
+                        dest_seq_dir=os.path.join(dest_dir,"Seq_"+file[:4])
+                        CreateDir(dest_seq_dir)
+                        #print(f"Seq. Image {file} -> {dest_seq_dir}")
+                        mtp_transfer(f"{src_file}", dest_seq_dir)
+                    elif re.match("GS.*\.(360|LRV|THM)",file):
+                        CreateDir(dest_video_dir)
+                        #print(f"Video {file} -> {dest_video_dir}")
+                        mtp_transfer(f"{src_file}", dest_video_dir)
+            for directory in dirs:
+                print(f"Dir {directory}")
+        quit()
 
-        shutil.move(f"{src}", cameraDir)
+        if args.dont_move:
+            shutil.copy(f"{src_dir}", dest_dir)
+        else:
+            shutil.move(f"{src_dir}", dest_dir)
 
         # FIXME: Build list of directory and filenames in sequences for rename_directories
 
         print(f"Transfer done.")
     else:
-        print(f"Could not find '{src}'")
+        print(f"ERROR: Could not find GoPro MTP source directory'{src_dir}'")
         quit()
 
     # FIXME: Move to end of script once below FIXME is fixed
-    subprocess.Popen(["nemo",cameraDir], start_new_session=True)
+    subprocess.Popen(["nemo",dest_dir], start_new_session=True)
 
     # FIXME: Remove quit once sequences is built
     quit()
 
 else:
     print(f"'{gopro_mtp} does not exist")
+    quit()   # FIXME: for development
     print("Camera not connected via USB/MTP, trying Bluetooth/WiFi")
 
     # Save SSID for currently connected WiFi
@@ -182,7 +229,8 @@ else:
         # Report camera overview
         gpCam.overview()
 
-        Create_Dir(camera)
+        # Place all files beneath a camera specific directory
+        CreateAndChangeToDestDir(camera)
 
         media = json.loads(gpCam.listMedia())
 
