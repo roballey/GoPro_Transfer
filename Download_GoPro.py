@@ -68,6 +68,30 @@ def rename_directories(sequences):
         except Exception as inst:
             print(f"Unable to rename {dirName}, exception {type(inst)}")
 
+def GetLocation(geolocator, fullName):
+    locName="UNKNOWN"
+    lat,lon = exif_latlon.get_lat_lon(fullName)
+    if lat is None:
+        print(f"ERROR: No lat/lon for '{fullName}'")
+    else:
+        location = geolocator.reverse((lat, lon))
+
+        if 'hamlet' in location.raw['address']:
+            locName=location.raw['address']['hamlet']
+        elif 'village' in location.raw['address']:
+            locName=location.raw['address']['village']
+        elif 'suburb' in location.raw['address']:
+            locName=location.raw['address']['suburb']
+        elif 'town' in location.raw['address']:
+            locName=location.raw['address']['town']
+        elif 'city' in location.raw['address']:
+            locName=location.raw['address']['city']
+        else:
+            print(f"ERROR: '{fullName}' No location from '{location.raw}'")
+
+        locName=locName.replace(" ","_")
+    return(locName)
+
 def CreateDir(directory):
     if not os.path.exists(directory):
         os.makedirs(directory)
@@ -97,8 +121,10 @@ args = parser.parse_args()
 if args.dont_move:
     print(f"\nCopying instead of moving files\n")
     mtp_transfer=shutil.copy
+    mtp_cleanup=lambda x: print(f"Not removing dir {x}")
 else:
     mtp_transfer=shutil.move
+    mtp_cleanup=os.rmdir
 
 print(f"\n\nTransferring files from GoPro '{args.Camera}'")
 print("=======================================================\n")
@@ -133,55 +159,54 @@ if os.path.exists(gopro_mtp):
     if os.path.exists(src_dir):
         now = datetime.now().strftime("%Y-%m-%d") 
         dest_dir=os.path.join(workDir,f"{now}_{camera}")
+        # FIXME: If dest_dir already exists use a new directory?
 
         dest_still_dir=os.path.join(dest_dir,f"Stills")
         dest_video_dir=os.path.join(dest_dir,f"Video")
+        dest_seq_dir=""
 
+        sequence_codes=[]
+
+        geolocator = Nominatim(user_agent="GoPro_Transfer")
         print(f"Transfering files from beneath '{src_dir}' to '{dest_dir}'...")
+        # TODO: Lots of effiency stuff:
+        #       - Compile regexps
+        #       - Keep track of directories created and don't continually check if they exist
         for root, dirs, files in os.walk(src_dir, topdown=False):
             num_files=len(files)
-            with tqdm(total=num_files) as pbar:
-                for file in files:
-                    pbar.update(1)
-                    src_file=os.path.join(root,file)
-                    if re.match("GS__.*\.JPG",file):
-                        CreateDir(dest_still_dir)
-                        #print(f"Still Image {file} -> {dest_still_dir}")
-                        mtp_transfer(f"{src_file}", dest_still_dir)
-                    elif re.match("GS.*\.JPG",file):
-                        dest_seq_dir=os.path.join(dest_dir,"Seq_"+file[:4])
-                        CreateDir(dest_seq_dir)
-                        #print(f"Seq. Image {file} -> {dest_seq_dir}")
-                        mtp_transfer(f"{src_file}", dest_seq_dir)
-                    elif re.match("GS.*\.(360|LRV|THM)",file):
-                        CreateDir(dest_video_dir)
-                        #print(f"Video {file} -> {dest_video_dir}")
-                        mtp_transfer(f"{src_file}", dest_video_dir)
+            for file in tqdm(files):
+                src_file=os.path.join(root,file)
+                if re.match("GS__.*\.JPG",file):
+                    CreateDir(dest_still_dir)
+                    tqdm.write(f"Still Image {file} -> {dest_still_dir}")
+                    mtp_transfer(f"{src_file}", dest_still_dir)
+                elif re.match("GS.*\.JPG",file):
+                    seq_code="Seq_"+file[2:4]
+                    if seq_code not in sequence_codes:
+                        sequence_codes.append(seq_code)
+                        location=GetLocation(geolocator, src_file)
+                        dest_seq_dir=os.path.join(dest_dir,seq_code+"_"+location)
+                        tqdm.write(f"Sequence '{seq_code}' at '{location}'")
+
+                    CreateDir(dest_seq_dir)
+                    mtp_transfer(f"{src_file}", dest_seq_dir)
+                elif re.match("GS.*\.(360|LRV|THM)",file):
+                    CreateDir(dest_video_dir)
+                    if re.match("GS.*\.360",file):
+                        tqdm.write(f"Video {file} -> {dest_video_dir}")
+                    mtp_transfer(f"{src_file}", dest_video_dir)
             for directory in dirs:
-                print(f"Dir {directory}")
-        quit()
-
-        if args.dont_move:
-            shutil.copy(f"{src_dir}", dest_dir)
-        else:
-            shutil.move(f"{src_dir}", dest_dir)
-
-        # FIXME: Build list of directory and filenames in sequences for rename_directories
+                mtp_cleanup(os.path.join(root,directory))
 
         print(f"Transfer done.")
+
     else:
         print(f"ERROR: Could not find GoPro MTP source directory'{src_dir}'")
         quit()
 
-    # FIXME: Move to end of script once below FIXME is fixed
-    subprocess.Popen(["nemo",dest_dir], start_new_session=True)
-
-    # FIXME: Remove quit once sequences is built
-    quit()
 
 else:
     print(f"'{gopro_mtp} does not exist")
-    quit()   # FIXME: for development
     print("Camera not connected via USB/MTP, trying Bluetooth/WiFi")
 
     # Save SSID for currently connected WiFi
@@ -283,5 +308,10 @@ else:
 
     time.sleep(2)  # Delay to ensure network reconnection is complete
 
-print("Renaming directories...")
-rename_directories(sequences)
+    print("Renaming directories...")
+    print("-------------------------------------------------------\n")
+    rename_directories(sequences)
+
+print("-------------------------------------------------------\n")
+print(f"Opening file explorer on '{dest_dir}'")
+subprocess.Popen(["nemo",dest_dir], start_new_session=True)
