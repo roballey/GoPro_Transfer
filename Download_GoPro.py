@@ -30,7 +30,7 @@ from gopro_ble import main as ble
 configFile = Path.home() / ".config" / "goprotransfer.json"
 sequences=[]
 
-def rename_directories(sequences):
+def RenameSequenceDirectories(sequences):
     # Rename directories based on location reverse geocoded from exif lat, long of first image in each sequence
     print("Renaming directories")
     print("-------------------------------------------------------\n")
@@ -96,18 +96,6 @@ def CreateDir(directory):
     if not os.path.exists(directory):
         os.makedirs(directory)
 
-def CreateAndChangeToDestDir(camera):
-    now = datetime.now().strftime("%Y-%m-%d") 
-    directory=f"{now}_{camera}"
-    if not os.path.exists(directory):
-        print(f"Creating directory '{directory}'")
-        os.makedirs(directory)
-    else:
-        print(f"Using existing directory '{directory}'")
-    print(f"GoPro files will be transferred to {directory}")
-    print("-------------------------------------------------------\n")
-    os.chdir(directory)
-
 #==============================================================================
 parser = argparse.ArgumentParser(
                     prog='Download_GoPro',
@@ -121,10 +109,12 @@ args = parser.parse_args()
 if args.dont_move:
     print(f"\nCopying instead of moving files\n")
     mtp_transfer=shutil.copy
-    mtp_cleanup=lambda x: print(f"Not removing dir {x}")
+    mtp_cleanup=lambda x: print(f"MTP: Not removing dir {x}")
+    wifi_file_cleanup=lambda x,y: print(f"WiFi: Not removing file {x}/{y}")
 else:
     mtp_transfer=shutil.move
     mtp_cleanup=os.rmdir
+    wifi_file_cleanup=gpCam.deleteFile
 
 print(f"\n\nTransferring files from GoPro '{args.Camera}'")
 print("=======================================================\n")
@@ -152,14 +142,15 @@ if camera is None:
     print(f"No entry for camera '{args.Camera}' in '{configFile}'")
     sys.exit(1)
 
+now = datetime.now().strftime("%Y-%m-%d") 
+dest_dir=os.path.join(workDir,f"{now}_{camera}")
+# FIXME: If dest_dir already exists create and use a new directory?
+
 if os.path.exists(gopro_mtp):
     print(f"{camera} connected via USB/MTP.")
 
     src_dir=f"{gopro_mtp}/GoPro MTP Client Disk Volume/DCIM"
     if os.path.exists(src_dir):
-        now = datetime.now().strftime("%Y-%m-%d") 
-        dest_dir=os.path.join(workDir,f"{now}_{camera}")
-        # FIXME: If dest_dir already exists use a new directory?
 
         dest_still_dir=os.path.join(dest_dir,f"Stills")
         dest_video_dir=os.path.join(dest_dir,f"Video")
@@ -254,8 +245,15 @@ else:
         # Report camera overview
         gpCam.overview()
 
-        # Place all files beneath a camera specific directory
-        CreateAndChangeToDestDir(camera)
+        # Create and change to destination directory
+        if not os.path.exists(dest_dir):
+            print(f"Creating directory '{dest_dir}'")
+            os.makedirs(dest_dir)
+        else:
+            print(f"Using existing directory '{dest_dir}'")
+        print(f"GoPro files will be transferred to {dest_dir}")
+        print("-------------------------------------------------------\n")
+        os.chdir(dest_dir)
 
         media = json.loads(gpCam.listMedia())
 
@@ -266,13 +264,15 @@ else:
 
                 # If file has a 'b' (begin?) entry, it represents a sequence (timelapse or burst)
                 if 'b' in mediaFile:
+                    seq_code="Seq_"+filename[2:4]
+                    print(f"DBG: filename {filename} code {seq_code}")
                     base=filename[:4]
-                    dirName=f"{base}_{camera}"
+                    rel_dir_name=seq_code
 
                     # Place each sequence in it's own directory
-                    if not os.path.exists(dirName):
-                        os.makedirs(dirName)
-                    os.chdir(dirName)
+                    if not os.path.exists(rel_dir_name):
+                        os.makedirs(rel_dir_name)
+                    os.chdir(rel_dir_name)
 
                     start=int(mediaFile["b"])
                     end=int(mediaFile["l"])
@@ -280,21 +280,21 @@ else:
                     for i in range(start,end+1):
                         image=f"{base}{i:04d}.JPG"
                         if i==start:
-                            sequences.append((dirName, image))
-                        print(f"   ---Download image {i-start}/{end-start} ",end=" ")
+                            sequences.append((rel_dir_name, image))
+                        print(f"   ---Download sequence image {i-start}/{end-start} ",end=" ")
                         gpCam.downloadMedia(srcdirname,image)
-                        gpCam.deleteFile(srcdirname, image)
+                        wifi_file_cleanup(srcdirname, image)
                     os.chdir("..")
                 else:
                     # Place non-timelapse files in their own directory
-                    dirName=f"NonTimeLapse_{camera}"
-                    if not os.path.exists(dirName):
-                        os.makedirs(dirName)
-                    os.chdir(dirName)
+                    rel_dir_name=f"NonSeq"
+                    if not os.path.exists(rel_dir_name):
+                        os.makedirs(rel_dir_name)
+                    os.chdir(rel_dir_name)
                     image=mediaFile['n']
                     print(f"---Download non-timelapse file ",end=" ")
                     gpCam.downloadMedia(srcdirname,filename)
-                    gpCam.deleteFile(srcdirname, filename)
+                    wifi_file_cleanup(srcdirname, filename)
                     os.chdir("..")
 
         print("Turning off GoPro...")
@@ -302,15 +302,16 @@ else:
         gpCam.power_off()
 
     # FIXME: ssid as reported by iwgetid is not always the same as name/id used by nmcli (sometimes it has "Auto" pre-pended)
-    print(f"Re-connecting to previous WiFi network '{ssid}'...")
-    print("-------------------------------------------------------\n")
-    subprocess.run(["nmcli","c","up", "id", ssid])
+    if ssid != gopro_wifi:
+        print(f"Re-connecting to previous WiFi network '{ssid}'...")
+        print("-------------------------------------------------------\n")
+        subprocess.run(["nmcli","c","up", "id", ssid])
 
     time.sleep(2)  # Delay to ensure network reconnection is complete
 
     print("Renaming directories...")
     print("-------------------------------------------------------\n")
-    rename_directories(sequences)
+    RenameSequenceDirectories(sequences)
 
 print("-------------------------------------------------------\n")
 print(f"Opening file explorer on '{dest_dir}'")
