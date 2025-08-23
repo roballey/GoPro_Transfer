@@ -89,11 +89,9 @@ if args.dont_move:
     print(f"\nCopying instead of moving files\n")
     mtp_transfer=shutil.copy
     mtp_cleanup=lambda x: print(f"MTP: Not removing dir {x}")
-    wifi_file_cleanup=lambda x,y: print(f"WiFi: Not removing file {x}/{y}")
 else:
     mtp_transfer=shutil.move
     mtp_cleanup=os.rmdir
-    wifi_file_cleanup=gpCam.deleteFile
 
 print(f"\n\nTransferring files from GoPro '{args.Camera}'")
 print("=======================================================\n")
@@ -262,7 +260,7 @@ else:
                             sequences.append((rel_dir_name, seq_image_filename))
                         print(f"   ---Download sequence image {i-start}/{end-start} ",end=" ")
                         gpCam.downloadMedia(src_dir,seq_image_filename)
-                        wifi_file_cleanup(src_dir, seq_image_filename)
+                        gpCam.deleteFile(src_dir, seq_image_filename)
                     os.chdir("..")
                 else:
                     # Place non-timelapse files in their own directory
@@ -272,7 +270,7 @@ else:
                     os.chdir(rel_dir_name)
                     print(f"---Download non-timelapse file ",end=" ")
                     gpCam.downloadMedia(src_dir,filename)
-                    wifi_file_cleanup(src_dir, filename)
+                    gpCam.deleteFile(src_dir, filename)
                     os.chdir("..")
 
         print("Turning off GoPro...")
