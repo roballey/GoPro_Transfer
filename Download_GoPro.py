@@ -6,7 +6,8 @@
 #  - Replaced ble subprocess execution with direct python calls
 #  - Updated exif_latlon.py
 #  - WIP: improve modularisation
-#  - WIP: Also support direct transfer of MTP mounted GoPro (works except for directory renaming)
+#  - Also support direct transfer of MTP mounted GoPro
+#  - Run from any directory and write files to "xxx" from config file
 
 import sys
 import os
@@ -15,16 +16,16 @@ import shutil
 import subprocess
 import json
 from goprocam import GoProCamera, constants
-from exif import Image
+#from exif import Image
 from geopy.geocoders import Nominatim
 import time
 from datetime import datetime
-import exif_latlon
 import asyncio
 import argparse
 import re
 from tqdm import tqdm
 
+import exif_latlon
 from gopro_ble import main as ble
 
 configFile = Path.home() / ".config" / "goprotransfer.json"
@@ -32,7 +33,7 @@ sequences=[]
 
 def RenameSequenceDirectories(sequences):
     # Rename directories based on location reverse geocoded from exif lat, long of first image in each sequence
-    print("Renaming directories")
+    print("Renaming sequence directories")
     print("-------------------------------------------------------\n")
     geolocator = Nominatim(user_agent="GoPro_Transfer")
 
@@ -40,33 +41,11 @@ def RenameSequenceDirectories(sequences):
         fullName=os.path.join(dirName,fileName)
         print(f"Renaming {dirName} based on {fileName} ...")
         try:
-            lat,lon = exif_latlon.get_lat_lon(fullName)
-            if lat is None:
-                print("No lat/lon, not moving")
-            else:
-                location = geolocator.reverse((lat, lon))
-
-                locName=""
-                if 'hamlet' in location.raw['address']:
-                    locName=location.raw['address']['hamlet']
-                elif 'village' in location.raw['address']:
-                    locName=location.raw['address']['village']
-                elif 'suburb' in location.raw['address']:
-                    locName=location.raw['address']['suburb']
-                elif 'town' in location.raw['address']:
-                    locName=location.raw['address']['town']
-                elif 'city' in location.raw['address']:
-                    locName=location.raw['address']['city']
-                else:
-                    print(f"{fullName} No location from - {location.raw}")
-
-                locName=locName.replace(" ","_")
-                print(locName)
-                os.rename(dirName, f"{dirName}_{locName}")
-                time.sleep(2)  # Delay so as to be a good citizen and not abuse nominatim
-            print()
+            locName=GetLocation(geolocator, fullName)
+            os.rename(dirName, f"{dirName}_{locName}")
         except Exception as inst:
             print(f"Unable to rename {dirName}, exception {type(inst)}")
+        time.sleep(2)  # Delay so as to be a good citizen and not abuse nominatim
 
 def GetLocation(geolocator, fullName):
     locName="UNKNOWN"
