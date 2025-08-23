@@ -1,5 +1,7 @@
 #! /bin/python3
 # FIXME: Does not work with GoPro MAX and 5Ghz WiFi band
+# FIXME: Not deleting images from Hero 10 when transfering via WiFi?
+# FIXME: Not robust to Nominatum connection failures (causes MTB Tx to abort)
 #
 # Changes:
 #  - Upgraded GoProCam to 4.2.0, can now connect WiFi on Hero 10
@@ -7,7 +9,7 @@
 #  - Updated exif_latlon.py
 #  - WIP: improve modularisation
 #  - Also support direct transfer of MTP mounted GoPro
-#  - Run from any directory and write files to "xxx" from config file
+#  - Run from any directory and write files to "work_dir" from config file
 
 import sys
 import os
@@ -137,19 +139,31 @@ if os.path.exists(gopro_mtp):
 
         geolocator = Nominatim(user_agent="GoPro_Transfer")
         print(f"Transfering files from beneath '{src_dir}' to '{dest_dir}'...")
-        # TODO: Lots of effiency stuff:
+        # TODO: Lots of efficency stuff:
         #       - Compile regexps
         #       - Keep track of directories created and don't continually check if they exist
+        # Regexs observed:
+        #    Type    Camera   Regex
+        #    Still   Max      GS__.*\.JPG
+        #    Seq     Max      GS.*\.JPG
+        #    Video   Max      GS.*\.360
+        #    Video   Max      GS.*\.THM
+        #    Video   Max      GS.*\.LRV
+        #    Still   Hero10   GOPR.*\.JPG
+        #    Seq     Hero10   GO.*\.JPG
+        #    Video   Hero10   GX.*\.MP4
+        #    Video   Hero10   GX.*\.THM
+        #    Video   Hero10   GX.*\.LRV
         for root, dirs, files in os.walk(src_dir, topdown=False):
             num_files=len(files)
             for file in tqdm(files):
                 src_file=os.path.join(root,file)
-                if re.match("GS__.*\.JPG",file):
+                if re.match("GS__.*\.JPG",file) or re.match("GOPR.*\.JPG",file):
                     CreateDir(dest_still_dir)
                     tqdm.write(f"Still Image {file} -> {dest_still_dir}")
                     mtp_transfer(f"{src_file}", dest_still_dir)
-                elif re.match("GS.*\.JPG",file):
-                    seq_code="Seq_"+file[2:4]
+                elif re.match("G..*\.JPG",file):
+                    seq_code="Seq_"+file[:4]
                     if seq_code not in sequence_codes:
                         sequence_codes.append(seq_code)
                         location=GetLocation(geolocator, src_file)
@@ -158,15 +172,15 @@ if os.path.exists(gopro_mtp):
 
                     CreateDir(dest_seq_dir)
                     mtp_transfer(f"{src_file}", dest_seq_dir)
-                elif re.match("GS.*\.(360|LRV|THM)",file):
+                elif re.match(".*\.(MP4|360|LRV|THM)",file):
                     CreateDir(dest_video_dir)
-                    if re.match("GS.*\.360",file):
+                    if re.match(".*\.(MP4|360)",file):
                         tqdm.write(f"Video {file} -> {dest_video_dir}")
                     mtp_transfer(f"{src_file}", dest_video_dir)
             for directory in dirs:
                 mtp_cleanup(os.path.join(root,directory))
 
-        print(f"Transfer done.")
+        print(f"MTP Transfer done.")
 
     else:
         print(f"ERROR: Could not find GoPro MTP source directory'{src_dir}'")
@@ -259,6 +273,7 @@ else:
                         if i==start:
                             sequences.append((rel_dir_name, seq_image_filename))
                         print(f"   ---Download sequence image {i-start}/{end-start} ",end=" ")
+                        # FIXME: Stop downloadMedia from printing so a tqdm progress bar can be used instead
                         gpCam.downloadMedia(src_dir,seq_image_filename)
                         gpCam.deleteFile(src_dir, seq_image_filename)
                     os.chdir("..")
@@ -283,7 +298,8 @@ else:
         print("-------------------------------------------------------\n")
         subprocess.run(["nmcli","c","up", "id", ssid])
 
-    time.sleep(2)  # Delay to ensure network reconnection is complete
+    # FIXME: Wait for network reconnection instead of just waiting
+    time.sleep(10)  # Delay to ensure network reconnection is complete
 
     print("Renaming directories...")
     print("-------------------------------------------------------\n")
