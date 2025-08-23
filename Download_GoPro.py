@@ -44,7 +44,7 @@ def RenameSequenceDirectories(sequences):
             locName=GetLocation(geolocator, fullName)
             os.rename(dirName, f"{dirName}_{locName}")
         except Exception as inst:
-            print(f"Unable to rename {dirName}, exception {type(inst)}")
+            print(f"ERROR: Unable to rename {dirName}, exception {type(inst)}")
         time.sleep(2)  # Delay so as to be a good citizen and not abuse nominatim
 
 def GetLocation(geolocator, fullName):
@@ -234,10 +234,10 @@ else:
         print("-------------------------------------------------------\n")
         os.chdir(dest_dir)
 
-        media = json.loads(gpCam.listMedia())
+        gopro_media = json.loads(gpCam.listMedia())
 
-        for directory in media["media"]:
-            srcdirname  = directory["d"]
+        for directory in gopro_media["media"]:
+            src_dir  = directory["d"]
             for mediaFile in directory["fs"]:
                 filename = mediaFile["n"];
 
@@ -257,12 +257,12 @@ else:
                     end=int(mediaFile["l"])
                     print(f"---Download sequence of {end-start} images")
                     for i in range(start,end+1):
-                        image=f"{base}{i:04d}.JPG"
+                        seq_image_filename=f"{base}{i:04d}.JPG"
                         if i==start:
-                            sequences.append((rel_dir_name, image))
+                            sequences.append((rel_dir_name, seq_image_filename))
                         print(f"   ---Download sequence image {i-start}/{end-start} ",end=" ")
-                        gpCam.downloadMedia(srcdirname,image)
-                        wifi_file_cleanup(srcdirname, image)
+                        gpCam.downloadMedia(src_dir,seq_image_filename)
+                        wifi_file_cleanup(src_dir, seq_image_filename)
                     os.chdir("..")
                 else:
                     # Place non-timelapse files in their own directory
@@ -270,10 +270,9 @@ else:
                     if not os.path.exists(rel_dir_name):
                         os.makedirs(rel_dir_name)
                     os.chdir(rel_dir_name)
-                    image=mediaFile['n']
                     print(f"---Download non-timelapse file ",end=" ")
-                    gpCam.downloadMedia(srcdirname,filename)
-                    wifi_file_cleanup(srcdirname, filename)
+                    gpCam.downloadMedia(src_dir,filename)
+                    wifi_file_cleanup(src_dir, filename)
                     os.chdir("..")
 
         print("Turning off GoPro...")
