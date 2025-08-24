@@ -1,3 +1,7 @@
+# NOTE
+
+Experimental version to enable running from anywhere
+
 # GoPro_Transfer
 Transfer files from a GoPro to a PC via WiFi.
 
@@ -5,8 +9,12 @@ First connects to the GoPro via BlueTooth to turn on Wifi, then connects to the 
 Files are placed beneath a directory named after the camera and the current date.  Within this directory each sequence goes into a subdirectory named with the sequence number and the location (based on the coordinates of the first image in the sequence).
 After transfering (moving) all images switches back to the original WiFi network.
 
+## Configuration File
+
+Requires a configuration file named `.goprotransfer.json` in `~/.config`
+
 ## Limitations
-- Tested with Hero 5 Black and Max 360, may or may not work with other models
+- Tested with Hero 10 Black, Hero 5 Black and Max 360, may or may not work with other models
 - Fails with Hero 5 Black containing ~10000 time lapse photos
 
 ## Notes
