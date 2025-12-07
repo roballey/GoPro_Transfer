@@ -67,6 +67,12 @@ def GetLocation(geolocator, fullName):
             locName=location.raw['address']['town']
         elif 'city' in location.raw['address']:
             locName=location.raw['address']['city']
+        elif 'county' in location.raw['address']:
+            locName=location.raw['address']['county']
+        elif 'state' in location.raw['address']:
+            locName=location.raw['address']['state']
+        elif 'name' in location.raw['address']:
+            locName=location.raw['address']['name']
         else:
             print(f"ERROR: '{fullName}' No location from '{location.raw}'")
 
@@ -125,6 +131,7 @@ now = datetime.now().strftime("%Y-%m-%d")
 dest_dir=os.path.join(workDir,f"{now}_{camera}")
 # FIXME: If dest_dir already exists create and use a new directory?
 
+# TODO: Retry MTP directory checking, sometimes it takes a while to connect
 if os.path.exists(gopro_mtp):
     print(f"{camera} connected via USB/MTP.")
 
@@ -307,4 +314,5 @@ else:
 
 print("-------------------------------------------------------\n")
 print(f"Opening file explorer on '{dest_dir}'")
+# FIXME: ISO nemo open gnome-terminal or start upload directly?
 subprocess.Popen(["nemo",dest_dir], start_new_session=True)
