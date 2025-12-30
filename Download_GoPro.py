@@ -165,11 +165,11 @@ if os.path.exists(gopro_mtp):
             num_files=len(files)
             for file in tqdm(files):
                 src_file=os.path.join(root,file)
-                if re.match("GS__.*\.JPG",file) or re.match("GOPR.*\.JPG",file):
+                if re.match("GS__.*\\.JPG",file) or re.match("GOPR.*\\.JPG",file):
                     CreateDir(dest_still_dir)
                     tqdm.write(f"Still Image {file} -> {dest_still_dir}")
                     mtp_transfer(f"{src_file}", dest_still_dir)
-                elif re.match("G..*\.JPG",file):
+                elif re.match("G..*\\.JPG",file):
                     seq_code="Seq_"+file[:4]
                     if seq_code not in sequence_codes:
                         sequence_codes.append(seq_code)
@@ -179,9 +179,9 @@ if os.path.exists(gopro_mtp):
 
                     CreateDir(dest_seq_dir)
                     mtp_transfer(f"{src_file}", dest_seq_dir)
-                elif re.match(".*\.(MP4|360|LRV|THM)",file):
+                elif re.match(".*\\.(MP4|360|LRV|THM)",file):
                     CreateDir(dest_video_dir)
-                    if re.match(".*\.(MP4|360)",file):
+                    if re.match(".*\\.(MP4|360)",file):
                         tqdm.write(f"Video {file} -> {dest_video_dir}")
                     mtp_transfer(f"{src_file}", dest_video_dir)
             for directory in dirs:
