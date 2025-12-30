@@ -1,4 +1,3 @@
-#! /bin/python3
 # FIXME: Does not work with GoPro MAX and 5Ghz WiFi band
 # FIXME: Not deleting images from Hero 10 when transfering via WiFi?
 # FIXME: Not robust to Nominatum connection failures (causes MTB Tx to abort)
@@ -300,6 +299,7 @@ else:
         gpCam.power_off()
 
     # FIXME: ssid as reported by iwgetid is not always the same as name/id used by nmcli (sometimes it has "Auto" pre-pended)
+    ssid = f"Auto {ssid}"
     if ssid != gopro_wifi:
         print(f"Re-connecting to previous WiFi network '{ssid}'...")
         print("-------------------------------------------------------\n")
