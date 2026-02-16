@@ -1,6 +1,6 @@
 # FIXME: Does not work with GoPro MAX and 5Ghz WiFi band
 # FIXME: Not deleting images from Hero 10 when transfering via WiFi?
-# FIXME: Not robust to Nominatum connection failures (causes MTB Tx to abort)
+# FIXME: Not robust to Nominatum connection failures, just warns, should retry
 #
 # Changes:
 #  - Upgraded GoProCam to 4.2.0, can now connect WiFi on Hero 10
@@ -144,7 +144,10 @@ if os.path.exists(gopro_mtp):
         sequence_codes=[]
 
         geolocator = Nominatim(user_agent="GoPro_Transfer")
+
+        # TODO: Get count of files and print
         print(f"Transfering files from beneath '{src_dir}' to '{dest_dir}'...")
+
         # TODO: Lots of efficency stuff:
         #       - Compile regexps
         #       - Keep track of directories created and don't continually check if they exist
@@ -164,20 +167,29 @@ if os.path.exists(gopro_mtp):
             num_files=len(files)
             for file in tqdm(files):
                 src_file=os.path.join(root,file)
+                # Handle individual still image files
                 if re.match("GS__.*\\.JPG",file) or re.match("GOPR.*\\.JPG",file):
                     CreateDir(dest_still_dir)
                     tqdm.write(f"Still Image {file} -> {dest_still_dir}")
                     mtp_transfer(f"{src_file}", dest_still_dir)
+                # Handle still image sequence files
                 elif re.match("G..*\\.JPG",file):
                     seq_code="Seq_"+file[:4]
                     if seq_code not in sequence_codes:
                         sequence_codes.append(seq_code)
-                        location=GetLocation(geolocator, src_file)
-                        dest_seq_dir=os.path.join(dest_dir,seq_code+"_"+location)
-                        tqdm.write(f"Sequence '{seq_code}' at '{location}'")
+                        # WIP: Handle nominatum failures, TODO: retry instead of just not using location in directory name
+                        try:
+                            location=GetLocation(geolocator, src_file)
+                            dest_seq_dir=os.path.join(dest_dir,seq_code+"_"+location)
+                            tqdm.write(f"Sequence '{seq_code}' at '{location}'")
+                        except Exception as inst:
+                            print(f"WARNING: Unable to get location for {src_file}, exception {type(inst)}")
+                            dest_seq_dir=os.path.join(dest_dir,seq_code)
+                            tqdm.write(f"Sequence '{seq_code}' ")
 
                     CreateDir(dest_seq_dir)
                     mtp_transfer(f"{src_file}", dest_seq_dir)
+                # Handle video files
                 elif re.match(".*\\.(MP4|360|LRV|THM)",file):
                     CreateDir(dest_video_dir)
                     if re.match(".*\\.(MP4|360)",file):
@@ -193,6 +205,7 @@ if os.path.exists(gopro_mtp):
         quit()
 
 
+# Couldn't connnect via MTP, try BT/Wifi
 else:
     print(f"'{gopro_mtp} does not exist")
     print("Camera not connected via USB/MTP, trying Bluetooth/WiFi")
@@ -314,5 +327,4 @@ else:
 
 print("-------------------------------------------------------\n")
 print(f"Opening file explorer on '{dest_dir}'")
-# FIXME: ISO nemo open gnome-terminal or start upload directly?
-subprocess.Popen(["nemo",dest_dir], start_new_session=True)
+subprocess.Popen(["gnome-terminal",dest_dir], start_new_session=True)
