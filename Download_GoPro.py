@@ -177,7 +177,7 @@ if os.path.exists(gopro_mtp):
                     seq_code="Seq_"+file[:4]
                     if seq_code not in sequence_codes:
                         sequence_codes.append(seq_code)
-                        # WIP: Handle nominatum failures, TODO: retry instead of just not using location in directory name
+                        # WIP: Handle nominatum failures, TODO: Use tenacity to retry instead of just not using location in directory name
                         try:
                             location=GetLocation(geolocator, src_file)
                             dest_seq_dir=os.path.join(dest_dir,seq_code+"_"+location)
