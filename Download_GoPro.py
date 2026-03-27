@@ -139,7 +139,7 @@ if os.path.exists(gopro_mtp):
 
         dest_still_dir=os.path.join(dest_dir,f"Stills")
         dest_video_dir=os.path.join(dest_dir,f"Video")
-        dest_seq_dir=""
+        dest_seq_root_dir=os.path.join(dest_dir,f"Seq")
 
         sequence_codes=[]
 
@@ -152,27 +152,30 @@ if os.path.exists(gopro_mtp):
         #       - Compile regexps
         #       - Keep track of directories created and don't continually check if they exist
         # Regexs observed:
-        #    Type    Camera   Regex
-        #    Still   Max      GS__.*\.JPG
-        #    Seq     Max      GS.*\.JPG
-        #    Video   Max      GS.*\.360
-        #    Video   Max      GS.*\.THM
-        #    Video   Max      GS.*\.LRV
-        #    Still   Hero10   GOPR.*\.JPG
-        #    Seq     Hero10   GO.*\.JPG
-        #    Video   Hero10   GX.*\.MP4
-        #    Video   Hero10   GX.*\.THM
-        #    Video   Hero10   GX.*\.LRV
+        #      Type    Size    Camera   Regex
+        # a.   Still   Flat    Max      GP__.*\.JPG
+        # b.   Seq     Flat    Max      GP.*\.JPG
+        # a.   Still   360     Max      GS__.*\.JPG
+        # b.   Seq     360     Max      GS.*\.JPG
+        # c.   Video           Max      GS.*\.360
+        # -    Video           Max      GS.*\.THM
+        # -    Video           Max      GS.*\.LRV
+        #-------------------------------------------
+        # a.   Still   Flat    Hero10   GOPR.*\.JPG
+        # b.   Seq     Flat    Hero10   GO.*\.JPG
+        # c.   Video   Flat    Hero10   GX.*\.MP4
+        # -    Video   Flat    Hero10   GX.*\.THM
+        # -    Video   Flat    Hero10   GX.*\.LRV
         for root, dirs, files in os.walk(src_dir, topdown=False):
             num_files=len(files)
             for file in tqdm(files):
                 src_file=os.path.join(root,file)
-                # Handle individual still image files
-                if re.match("GS__.*\\.JPG",file) or re.match("GOPR.*\\.JPG",file):
+                # a. Handle individual still image files
+                if re.match("GP__.*\\.JPG",file) or re.match("GS__.*\\.JPG",file) or re.match("GOPR.*\\.JPG",file):
                     CreateDir(dest_still_dir)
                     tqdm.write(f"Still Image {file} -> {dest_still_dir}")
                     mtp_transfer(f"{src_file}", dest_still_dir)
-                # Handle still image sequence files
+                # b. Handle still image sequence files
                 elif re.match("G..*\\.JPG",file):
                     seq_code="Seq_"+file[:4]
                     if seq_code not in sequence_codes:
@@ -180,16 +183,16 @@ if os.path.exists(gopro_mtp):
                         # WIP: Handle nominatum failures, TODO: Use tenacity to retry instead of just not using location in directory name
                         try:
                             location=GetLocation(geolocator, src_file)
-                            dest_seq_dir=os.path.join(dest_dir,seq_code+"_"+location)
+                            dest_seq_dir=os.path.join(dest_seq_root_dir,seq_code+"_"+location)
                             tqdm.write(f"Sequence '{seq_code}' at '{location}'")
                         except Exception as inst:
                             print(f"WARNING: Unable to get location for {src_file}, exception {type(inst)}")
-                            dest_seq_dir=os.path.join(dest_dir,seq_code)
+                            dest_seq_dir=os.path.join(dest_seq_root_dir,seq_code)
                             tqdm.write(f"Sequence '{seq_code}' ")
 
                     CreateDir(dest_seq_dir)
                     mtp_transfer(f"{src_file}", dest_seq_dir)
-                # Handle video files
+                # c. Handle video files
                 elif re.match(".*\\.(MP4|360|LRV|THM)",file):
                     CreateDir(dest_video_dir)
                     if re.match(".*\\.(MP4|360)",file):
@@ -327,4 +330,6 @@ else:
 
 print("-------------------------------------------------------\n")
 print(f"Opening file explorer on '{dest_dir}'")
-subprocess.Popen(["gnome-terminal",dest_dir], start_new_session=True)
+subprocess.Popen(["nemo",dest_dir], start_new_session=True)
+# FIXME: Why wasn;t gnome-terminal working?
+#subprocess.Popen(["gnome-terminal",dest_dir], start_new_session=True)
