@@ -146,26 +146,27 @@ if os.path.exists(gopro_mtp):
         geolocator = Nominatim(user_agent="GoPro_Transfer")
 
         # TODO: Get count of files and print
-        print(f"Transfering files from beneath '{src_dir}' to '{dest_dir}'...")
+        print(f"Transferring files from beneath '{src_dir}' to '{dest_dir}'...")
 
-        # TODO: Lots of efficency stuff:
+        # TODO: Lots of efficiency stuff:
         #       - Compile regexps
         #       - Keep track of directories created and don't continually check if they exist
+        # FIXME: Put flat and spherical files into separate directories
         # Regexs observed:
-        #      Type    Size    Camera   Regex
-        # a.   Still   Flat    Max      GP__.*\.JPG
-        # b.   Seq     Flat    Max      GP.*\.JPG
-        # a.   Still   360     Max      GS__.*\.JPG
-        # b.   Seq     360     Max      GS.*\.JPG
-        # c.   Video           Max      GS.*\.360
-        # -    Video           Max      GS.*\.THM
-        # -    Video           Max      GS.*\.LRV
+        #      Type    Form      Camera   Regex
+        # a.   Still   Flat      Max      GP__.*\.JPG
+        # b.   Seq     Flat      Max      GP.*\.JPG
+        # a.   Still   Spherical Max      GS__.*\.JPG
+        # b.   Seq     Spherical Max      GS.*\.JPG
+        # c.   Video             Max      GS.*\.360
+        # -    Video             Max      GS.*\.THM
+        # -    Video             Max      GS.*\.LRV
         #-------------------------------------------
-        # a.   Still   Flat    Hero10   GOPR.*\.JPG
-        # b.   Seq     Flat    Hero10   GO.*\.JPG
-        # c.   Video   Flat    Hero10   GX.*\.MP4
-        # -    Video   Flat    Hero10   GX.*\.THM
-        # -    Video   Flat    Hero10   GX.*\.LRV
+        # a.   Still   Flat      Hero10   GOPR.*\.JPG
+        # b.   Seq     Flat      Hero10   GO.*\.JPG
+        # c.   Video   Flat      Hero10   GX.*\.MP4
+        # -    Video   Flat      Hero10   GX.*\.THM
+        # -    Video   Flat      Hero10   GX.*\.LRV
         for root, dirs, files in os.walk(src_dir, topdown=False):
             num_files=len(files)
             for file in tqdm(files):
