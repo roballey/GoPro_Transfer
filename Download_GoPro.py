@@ -1,6 +1,5 @@
 # FIXME: Does not work with GoPro MAX and 5Ghz WiFi band
 # FIXME: Not deleting images from Hero 10 when transfering via WiFi?
-# FIXME: Not robust to Nominatum connection failures, just warns, should retry
 #
 # Changes:
 #  - Upgraded GoProCam to 4.2.0, can now connect WiFi on Hero 10
@@ -9,6 +8,7 @@
 #  - WIP: improve modularisation
 #  - Also support direct transfer of MTP mounted GoPro
 #  - Run from any directory and write files to "work_dir" from config file
+#  - Retry on Nominatum failures
 
 import sys
 import os
@@ -33,7 +33,7 @@ configFile = Path.home() / ".config" / "goprotransfer.json"
 sequences=[]
 
 def RenameSequenceDirectories(sequences):
-    # Rename directories based on location reverse geocoded from exif lat, long of first image in each sequence
+    # Rename directories based on location of first image in each sequence
     print("Renaming sequence directories")
     print("-------------------------------------------------------\n")
     geolocator = Nominatim(user_agent="GoPro_Transfer")
@@ -41,11 +41,8 @@ def RenameSequenceDirectories(sequences):
     for dirName, fileName in sequences:
         fullName=os.path.join(dirName,fileName)
         print(f"Renaming {dirName} based on {fileName} ...")
-        try:
-            locName=GetLocation(geolocator, fullName)
-            os.rename(dirName, f"{dirName}_{locName}")
-        except Exception as inst:
-            print(f"ERROR: Unable to rename {dirName}, exception {type(inst)}")
+        locName=GetLocation(geolocator, fullName)
+        os.rename(dirName, f"{dirName}_{locName}")
         time.sleep(2)  # Delay so as to be a good citizen and not abuse nominatim
 
 def GetLocation(geolocator, fullName):
@@ -54,26 +51,42 @@ def GetLocation(geolocator, fullName):
     if lat is None:
         print(f"ERROR: No lat/lon for '{fullName}'")
     else:
-        location = geolocator.reverse((lat, lon))
+        done = False
+        retries = 0
+        locName="UNKNOWN"
 
-        if 'hamlet' in location.raw['address']:
-            locName=location.raw['address']['hamlet']
-        elif 'village' in location.raw['address']:
-            locName=location.raw['address']['village']
-        elif 'suburb' in location.raw['address']:
-            locName=location.raw['address']['suburb']
-        elif 'town' in location.raw['address']:
-            locName=location.raw['address']['town']
-        elif 'city' in location.raw['address']:
-            locName=location.raw['address']['city']
-        elif 'county' in location.raw['address']:
-            locName=location.raw['address']['county']
-        elif 'state' in location.raw['address']:
-            locName=location.raw['address']['state']
-        elif 'name' in location.raw['address']:
-            locName=location.raw['address']['name']
-        else:
-            print(f"ERROR: '{fullName}' No location from '{location.raw}'")
+        while not done:
+          try:
+            location = geolocator.reverse((lat, lon))
+
+            if 'hamlet' in location.raw['address']:
+                locName=location.raw['address']['hamlet']
+            elif 'village' in location.raw['address']:
+                locName=location.raw['address']['village']
+            elif 'suburb' in location.raw['address']:
+                locName=location.raw['address']['suburb']
+            elif 'town' in location.raw['address']:
+                locName=location.raw['address']['town']
+            elif 'city' in location.raw['address']:
+                locName=location.raw['address']['city']
+            elif 'county' in location.raw['address']:
+                locName=location.raw['address']['county']
+            elif 'state' in location.raw['address']:
+                locName=location.raw['address']['state']
+            elif 'name' in location.raw['address']:
+                locName=location.raw['address']['name']
+            else:
+                print(f"WARNING: '{fullName}' No location from '{location.raw}'")
+            done = True
+
+          except Exception as inst:
+              retries = retries + 1
+              if retries > 5:
+                print(f"ERROR: Unable to reverse geocode even after retrying")
+                done=True
+              else:
+                print(f"WARNING: Unable to reverse geocode, exception {type(inst)}, retrying")
+                time.sleep(2)  # Delay so as to be a good citizen and not abuse nominatim
 
         locName=locName.replace(" ","_")
     return(locName)
@@ -172,24 +185,20 @@ if os.path.exists(gopro_mtp):
             for file in tqdm(files):
                 src_file=os.path.join(root,file)
                 # a. Handle individual still image files
+                # TODO: Put in separate flat and spherical directories
                 if re.match("GP__.*\\.JPG",file) or re.match("GS__.*\\.JPG",file) or re.match("GOPR.*\\.JPG",file):
                     CreateDir(dest_still_dir)
                     tqdm.write(f"Still Image {file} -> {dest_still_dir}")
                     mtp_transfer(f"{src_file}", dest_still_dir)
-                # b. Handle still image sequence files
+                # b. Handle image sequence files
+                # TODO: Put in separate flat and spherical directories
                 elif re.match("G..*\\.JPG",file):
                     seq_code="Seq_"+file[:4]
                     if seq_code not in sequence_codes:
                         sequence_codes.append(seq_code)
-                        # WIP: Handle nominatum failures, TODO: Use tenacity to retry instead of just not using location in directory name
-                        try:
-                            location=GetLocation(geolocator, src_file)
-                            dest_seq_dir=os.path.join(dest_seq_root_dir,seq_code+"_"+location)
-                            tqdm.write(f"Sequence '{seq_code}' at '{location}'")
-                        except Exception as inst:
-                            print(f"WARNING: Unable to get location for {src_file}, exception {type(inst)}")
-                            dest_seq_dir=os.path.join(dest_seq_root_dir,seq_code)
-                            tqdm.write(f"Sequence '{seq_code}' ")
+                        location=GetLocation(geolocator, src_file)
+                        dest_seq_dir=os.path.join(dest_seq_root_dir,seq_code+"_"+location)
+                        tqdm.write(f"Sequence '{seq_code}' at '{location}'")
 
                     CreateDir(dest_seq_dir)
                     mtp_transfer(f"{src_file}", dest_seq_dir)
