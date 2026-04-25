@@ -141,7 +141,23 @@ if camera is None:
 
 now = datetime.now().strftime("%Y-%m-%d") 
 dest_dir=os.path.join(workDir,f"{now}_{camera}")
-# FIXME: If dest_dir already exists create and use a new directory?
+
+if not os.path.exists(dest_dir):
+  os.mkdir(dest_dir)
+  print(f"Output directory '{dest_dir}' created.")
+else:
+  count=1;
+  created=False;
+  
+  while not created:
+    dest_dir=os.path.join(workDir,f"{now}_{camera}_{count}")
+  
+    if os.path.isdir(dest_dir):
+      count = count+1;
+    else:
+      os.mkdir(dest_dir)
+      print(f"Output directory '{dest_dir}' created.")
+      created=True
 
 if os.path.exists(gopro_mtp):
     print(f"{camera} connected via USB/MTP.")
@@ -346,3 +362,4 @@ os.chdir(dest_dir)
 subprocess.Popen(["gnome-terminal"], start_new_session=True)
 
 print(f"Done.")
+time.sleep(30)
