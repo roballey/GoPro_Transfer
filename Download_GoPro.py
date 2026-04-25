@@ -143,7 +143,6 @@ now = datetime.now().strftime("%Y-%m-%d")
 dest_dir=os.path.join(workDir,f"{now}_{camera}")
 # FIXME: If dest_dir already exists create and use a new directory?
 
-# TODO: Retry MTP directory checking, sometimes it takes a while to connect
 if os.path.exists(gopro_mtp):
     print(f"{camera} connected via USB/MTP.")
 
@@ -341,5 +340,9 @@ else:
 print("-------------------------------------------------------\n")
 print(f"Opening file explorer on '{dest_dir}'")
 subprocess.Popen(["nemo",dest_dir], start_new_session=True)
-# FIXME: Why wasn;t gnome-terminal working?
-#subprocess.Popen(["gnome-terminal",dest_dir], start_new_session=True)
+
+print(f"Running gonme-terminal in '{dest_dir}'")
+os.chdir(dest_dir)
+subprocess.Popen(["gnome-terminal"], start_new_session=True)
+
+print(f"Done.")
