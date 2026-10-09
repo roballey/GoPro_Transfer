@@ -176,6 +176,13 @@ if os.path.exists(gopro_mtp):
         # TODO: Get count of files and print
         print(f"Transferring files from beneath '{src_dir}' to '{dest_dir}'...")
 
+        src_path = Path(src_dir);
+        img_count = sum(1 for item in src_path.rglob('*.JPG') if item.is_file())
+        vid_spherical_count = sum(1 for item in src_path.rglob('*.360') if item.is_file())
+        vid_flat_count = sum(1 for item in src_path.rglob('*.MP4') if item.is_file())
+
+        print(f" - {img_count} images, {vid_spherical_count+vid_flat_count} videos")
+
         # TODO: Lots of efficiency stuff:
         #       - Compile regexps
         #       - Keep track of directories created and don't continually check if they exist
@@ -216,7 +223,10 @@ if os.path.exists(gopro_mtp):
                         tqdm.write(f"Sequence '{seq_code}' at '{location}'")
 
                     CreateDir(dest_seq_dir)
-                    mtp_transfer(f"{src_file}", dest_seq_dir)
+                    try:
+                       mtp_transfer(f"{src_file}", dest_seq_dir)
+                    except:
+                      print(f"**ERROR: Exception doing transfer")
                 # c. Handle video files
                 elif re.match(".*\\.(MP4|360|LRV|THM)",file):
                     CreateDir(dest_video_dir)
